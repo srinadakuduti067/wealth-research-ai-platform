@@ -2,11 +2,14 @@ import asyncio
 import csv
 import io
 import json
+import logging
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
 from app.config import settings
+
+logger = logging.getLogger("copilot.tools.quote")
 
 YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?range=1d&interval=1m"
 STOOQ_URL = "https://stooq.com/q/l/?s={ticker}.us&f=sd2t2ohlcv&h&e=csv"
@@ -91,9 +94,12 @@ def _live_quote(symbol: str) -> dict | None:
     for provider in (_yahoo_quote, _stooq_quote):
         try:
             quote = provider(symbol)
-        except (urllib.error.URLError, OSError, json.JSONDecodeError, KeyError, TypeError):
+        except (urllib.error.URLError, OSError, json.JSONDecodeError, KeyError, TypeError) as exc:
+            logger.info("live provider %s failed for %s: %s", provider.__name__, symbol, exc)
             continue
         if quote:
+            logger.info("live quote for %s via %s | %s %s", symbol,
+                        provider.__name__, quote["price"], quote["currency"])
             return quote
     return None
 
@@ -109,6 +115,7 @@ async def get_stock_quote(ticker: str) -> dict:
     symbol = ticker.upper()
     fixture = _fixture_quote(symbol)
     if fixture and fixture.get("synthetic_only"):
+        logger.info("synthetic-only fixture quote for %s", symbol)
         return {"quote": fixture, "warning": "Synthetic demo fixture; not live market data."}
     if settings.quotes_mode != "fixture":
         live = await asyncio.to_thread(_live_quote, symbol)
@@ -116,5 +123,6 @@ async def get_stock_quote(ticker: str) -> dict:
             live["fetched_at"] = datetime.now(timezone.utc).isoformat()
             return {"quote": live, "warning": "Third-party public feed; verify against a licensed source."}
     if fixture:
+        logger.info("fixture fallback quote for %s", symbol)
         return {"quote": fixture, "warning": "Synthetic demo fixture; not live market data."}
     return {"error": "unknown_ticker", "message": f"No live or demo quote found for {symbol}."}

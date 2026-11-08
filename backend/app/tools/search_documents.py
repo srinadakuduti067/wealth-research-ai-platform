@@ -1,7 +1,10 @@
 import asyncio
+import logging
 
 from app.db import search_chunks
 from app.gemini_client import embed
+
+logger = logging.getLogger("copilot.tools.search_documents")
 
 
 async def search_documents(
@@ -12,10 +15,15 @@ async def search_documents(
     selection: str = "relevant",
     top_k: int = 5,
 ) -> dict:
+    logger.info("embed query | ticker=%s type=%s selection=%s top_k=%s query=%r",
+                ticker, document_type, selection, top_k, query[:100])
     vector = await asyncio.to_thread(embed, query, "RETRIEVAL_QUERY")
+    logger.info("vector search | embedding_dims=%d", len(vector))
     rows = await asyncio.to_thread(
         search_chunks, ticker.upper(), vector, document_type, period, selection, top_k
     )
+    logger.info("retrieved %d passages | docs=%s", len(rows),
+                sorted({row["document_id"] for row in rows}))
     return {
         "passages": [
             {

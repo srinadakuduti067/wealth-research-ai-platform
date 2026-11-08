@@ -1,5 +1,12 @@
 import asyncio
+import logging
 from pathlib import Path
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)-8s %(name)s | %(message)s",
+    datefmt="%H:%M:%S",
+)
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse

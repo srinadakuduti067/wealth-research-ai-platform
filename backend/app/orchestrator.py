@@ -1,7 +1,10 @@
 import asyncio
+import logging
 import time
 
 from google.genai import types
+
+logger = logging.getLogger("copilot.orchestrator")
 
 from app.config import settings
 from app.executor import execute
@@ -35,6 +38,7 @@ async def research(question: str, ticker: str | None = None) -> dict:
     if ticker:
         prompt += f"\nSelected ticker in the UI (context only): {ticker.upper()}"
     history = [types.Content(role="user", parts=[types.Part.from_text(text=prompt)])]
+    logger.info("request start | question=%r ticker=%s", question[:120], ticker)
     tools_used: list[str] = []
     sources: list[dict] = []
     source_by_chunk: dict[str, str] = {}
@@ -55,7 +59,14 @@ async def research(question: str, ticker: str | None = None) -> dict:
         remaining = DEADLINE_SECONDS - (time.monotonic() - start)
         if remaining <= 0:
             errors.append("The request timed out.")
+            logger.warning("deadline exceeded after %.1fs", time.monotonic() - start)
             break
+        logger.info(
+            "model call round %d/%d | model=%s history_parts=%d budget=%.1fs",
+            round_number + 1, MAX_ROUNDS + 1, settings.gemini_model,
+            sum(len(c.parts or []) for c in history), remaining,
+        )
+        model_start = time.monotonic()
         try:
             response = await asyncio.wait_for(
                 asyncio.to_thread(
@@ -66,9 +77,11 @@ async def research(question: str, ticker: str | None = None) -> dict:
                 ),
                 timeout=remaining,
             )
-        except Exception:
+        except Exception as exc:
             errors.append("The model is temporarily unavailable.")
+            logger.error("model call failed | %s: %s", type(exc).__name__, str(exc)[:300])
             break
+        logger.info("model responded in %.1fs", time.monotonic() - model_start)
         if not response.candidates or not response.candidates[0].content:
             errors.append("The model did not return an answer.")
             break
@@ -76,9 +89,14 @@ async def research(question: str, ticker: str | None = None) -> dict:
         calls = [part.function_call for part in candidate.parts if part.function_call]
         if not calls:
             final_text = " ".join(part.text for part in candidate.parts if part.text).strip()
+            logger.info("model returned final answer | %d chars, %d tools used",
+                        len(final_text), len(tools_used))
             break
+        logger.info("model requested %d tool call(s): %s", len(calls),
+                    [(c.name, dict(c.args or {})) for c in calls])
         if round_number == MAX_ROUNDS or executions >= MAX_EXECUTIONS:
             errors.append("Tool limit reached; only available evidence can be shown.")
+            logger.warning("tool limits hit | round=%d executions=%d", round_number, executions)
             break
 
         history.append(candidate)  # Retains Gemini's function-call IDs and thought signatures.
@@ -94,10 +112,15 @@ async def research(question: str, ticker: str | None = None) -> dict:
                 tools_used.append(name)
             if name == "get_stock_quote":
                 quote_attempted = True
+            tool_start = time.monotonic()
             result = await execute(
                 name, call.args if isinstance(call.args, dict) else {},
                 DEADLINE_SECONDS - (time.monotonic() - start),
             )
+            logger.info("tool %s returned in %.1fs | keys=%s%s", name,
+                        time.monotonic() - tool_start,
+                        sorted(result.keys()),
+                        f" passages={len(result['passages'])}" if "passages" in result else "")
             if result.get("error"):
                 errors.append(result["message"])
                 tool_error_codes.append(result["error"])
@@ -168,6 +191,9 @@ async def research(question: str, ticker: str | None = None) -> dict:
         final_text = safe_fallback(sources, quote)
     if missing_evidence:
         final_text += " Some requested document evidence was not found in the demo collection."
+    logger.info("request done | status=%s tools=%s sources=%d quote=%s errors=%s elapsed=%.1fs",
+                "partial" if errors or missing_evidence else "complete", tools_used,
+                len(sources), bool(quote), errors, time.monotonic() - start)
     return {
         "status": "partial" if errors or missing_evidence else "complete",
         "answer": final_text,
