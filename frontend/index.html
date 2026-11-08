@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fieldnotes | Research Copilot</title>
+  <style>
+    :root {
+      --ink: #20372f; --muted: #66786f; --paper: #f7f5ed;
+      --line: #d9dfd3; --leaf: #277154; --warning: #9e4f22;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; color: var(--ink); font: 16px/1.55 "Avenir Next", "Helvetica Neue", sans-serif;
+      background: radial-gradient(ellipse at 80% 0%, #deeadf 0, transparent 45%), var(--paper);
+      min-height: 100vh;
+    }
+    .shell { max-width: 900px; margin: auto; padding: 26px 24px 88px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); padding-bottom: 16px; }
+    .brand { font-family: Georgia, serif; font-size: 22px; font-weight: bold; letter-spacing: -.05em; }
+    .brand span { color: var(--leaf); }
+    .eyebrow, .label { font: 700 11px/1.4 "Courier New", monospace; letter-spacing: .12em; text-transform: uppercase; }
+    .eyebrow { color: var(--leaf); margin: 0 0 12px; }
+    .demo { color: var(--warning); background: #fcebdc; border: 1px solid #e6bf9e; border-radius: 50px; padding: 6px 12px; font-size: 12px; font-weight: 700; }
+    main { padding-top: 65px; }
+    h1 { font: normal clamp(38px, 7vw, 68px)/1.07 Georgia, serif; letter-spacing: -.05em; max-width: 740px; margin: 0; }
+    .intro { color: var(--muted); max-width: 580px; margin: 21px 0 40px; }
+    .panel { background: #fffefb; border: 1px solid var(--line); box-shadow: 0 16px 50px #213e3010; border-radius: 14px; padding: 24px; }
+    label { display: block; margin-bottom: 9px; }
+    textarea, input {
+      display: block; width: 100%; padding: 13px 14px; border: 1px solid #cdd7cb; border-radius: 7px;
+      background: #fff; color: var(--ink); font: inherit; resize: vertical;
+    }
+    textarea:focus, input:focus { outline: 2px solid #8dc1a2; outline-offset: 1px; }
+    textarea { min-height: 110px; }
+    .row { display: flex; align-items: end; gap: 16px; margin-top: 18px; }
+    .ticker-field { width: 155px; }
+    .ticker-field input { text-transform: uppercase; }
+    button[type=submit] {
+      min-height: 50px; padding: 0 24px; background: var(--ink); color: white; border: 0;
+      border-radius: 7px; cursor: pointer; font: 700 14px "Avenir Next", sans-serif;
+    }
+    button[type=submit]:hover { background: var(--leaf); }
+    button:disabled { opacity: .6; cursor: wait; }
+    .examples { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+    .examples button { background: transparent; color: var(--leaf); border: 1px solid #c2d9c9; border-radius: 30px; padding: 7px 11px; cursor: pointer; }
+    #progress { color: var(--muted); margin: 20px 0; }
+    #result { margin-top: 32px; animation: reveal .35s ease both; }
+    @keyframes reveal { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: translateY(0); } }
+    .result-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+    h2 { font: normal 29px Georgia, serif; margin: 0; }
+    .status { font-size: 12px; color: var(--muted); text-transform: uppercase; }
+    .answer { white-space: pre-wrap; line-height: 1.85; margin: 20px 0; }
+    .citation { border: 0; border-bottom: 1px solid var(--leaf); background: none; color: var(--leaf); padding: 0 2px; cursor: pointer; font: inherit; }
+    .quote { border-left: 3px solid var(--leaf); background: #f0f6ef; padding: 16px 19px; margin: 18px 0; }
+    .price { font: normal 30px Georgia, serif; margin: 3px 0; }
+    .fine { font-size: 12px; color: var(--muted); margin: 3px 0; }
+    .sources { margin-top: 28px; }
+    details { border-top: 1px solid var(--line); padding: 14px 0; }
+    summary { cursor: pointer; font-weight: 700; }
+    .excerpt { white-space: pre-wrap; background: #f3f5ef; border-radius: 6px; padding: 15px; font-size: 14px; }
+    .warning { color: var(--warning); font-weight: 700; font-size: 12px; }
+    footer { margin-top: 44px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); padding-top: 16px; }
+    @media (max-width: 580px) {
+      .shell { padding: 16px 16px 60px; } main { padding-top: 40px; }
+      .row { align-items: stretch; flex-direction: column; } .ticker-field { width: 100%; }
+      button[type=submit] { width: 100%; } .demo { font-size: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header><div class="brand">Fieldnotes<span>.</span></div><span class="demo">SYNTHETIC RESEARCH DEMO</span></header>
+    <main>
+      <p class="eyebrow">Research desk / prototype 01</p>
+      <h1>A starting point for better questions.</h1>
+      <p class="intro">Explore a small collection of synthetic filings and transcripts. Quotes come from a live public feed for real tickers and labeled fixtures for demo tickers.</p>
+      <form class="panel" id="chat-form">
+        <label class="label" for="question">Your question</label>
+        <textarea id="question" required minlength="2" maxlength="4000" placeholder="What risks are mentioned in the latest available AAPL filing?"></textarea>
+        <div class="row">
+          <div class="ticker-field"><label class="label" for="ticker">Ticker (optional)</label><input id="ticker" maxlength="12" placeholder="AAPL"></div>
+          <button type="submit" id="submit">Explore sources &rarr;</button>
+        </div>
+        <div class="examples" aria-label="Example questions">
+          <button type="button" data-question="What risks are listed for DEMO?" data-ticker="DEMO">DEMO risks</button>
+          <button type="button" data-question="What is AAPL's quote and what are the highlights of its latest available filing?" data-ticker="AAPL">AAPL quote + filing</button>
+          <button type="button" data-question="What did management say about margins?" data-ticker="DEMO">Margins</button>
+        </div>
+      </form>
+      <p id="progress" role="status" aria-live="polite"></p>
+      <section id="result" hidden aria-live="polite">
+        <div class="result-head"><h2>Research notes</h2><span class="status" id="status"></span></div>
+        <div class="answer" id="answer"></div>
+        <div id="quote-card"></div>
+        <div id="sources" class="sources"></div>
+      </section>
+      <footer>Synthetic data only. No real SEC filings, live market data, investment advice, or account access.</footer>
+    </main>
+  </div>
+  <script>
+    const form = document.querySelector("#chat-form");
+    const question = document.querySelector("#question");
+    const ticker = document.querySelector("#ticker");
+    const result = document.querySelector("#result");
+    const progress = document.querySelector("#progress");
+    document.querySelectorAll(".examples button").forEach(button => {
+      button.addEventListener("click", () => {
+        question.value = button.dataset.question;
+        ticker.value = button.dataset.ticker;
+        question.focus();
+      });
+    });
+
+    function showResponse(data) {
+      result.hidden = false;
+      document.querySelector("#status").textContent = data.status.replaceAll("_", " ");
+      const answer = document.querySelector("#answer");
+      answer.replaceChildren();
+      const known = new Set(data.sources.map(source => source.source_id));
+      const tokens = (data.answer || "").split(/(\[S\d+\])/g);
+      for (const token of tokens) {
+        const id = token.slice(1, -1);
+        if (/^\[S\d+\]$/.test(token) && known.has(id)) {
+          const link = document.createElement("button");
+          link.className = "citation";
+          link.textContent = token;
+          link.onclick = () => {
+            const target = document.getElementById(`source-${id}`);
+            target.open = true;
+            target.scrollIntoView({ behavior: "smooth", block: "center" });
+          };
+          answer.append(link);
+        } else {
+          answer.append(document.createTextNode(token));
+        }
+      }
+
+      const quoteCard = document.querySelector("#quote-card");
+      quoteCard.replaceChildren();
+      if (data.quote) {
+        const q = data.quote;
+        const box = document.createElement("div");
+        box.className = "quote";
+        const label = document.createElement("div");
+        label.className = "label";
+        const live = q.is_synthetic !== true;
+        label.textContent = `${q.ticker} / ${live ? "live quote" : "synthetic quote fixture"}`;
+        const price = document.createElement("div");
+        price.className = "price";
+        let move = "";
+        if (q.change_percent != null) {
+          move = `  (${q.change_percent >= 0 ? "+" : ""}${q.change_percent}% today)`;
+        }
+        price.textContent = `${q.price} ${q.currency}${move}`;
+        const detail = document.createElement("p");
+        detail.className = "fine";
+        detail.textContent = `${q.provider} · ${q.quote_type}${q.exchange ? " · " + q.exchange : ""} · ${q.quote_timestamp} · ${live ? "public feed; verify before use" : "not live market data"}`;
+        box.append(label, price, detail);
+        quoteCard.append(box);
+      }
+      const sources = document.querySelector("#sources");
+      sources.replaceChildren();
+      if (data.sources.length) {
+        const heading = document.createElement("h2");
+        heading.textContent = "Source passages";
+        sources.append(heading);
+      }
+      for (const source of data.sources) {
+        const card = document.createElement("details");
+        card.id = `source-${source.source_id}`;
+        const heading = document.createElement("summary");
+        heading.textContent = `[${source.source_id}] ${source.title} · ${source.section}`;
+        const meta = document.createElement("p");
+        meta.className = "fine";
+        meta.textContent = `${source.document_date} · ${source.period} · latest available means within this collection`;
+        const warning = document.createElement("p");
+        warning.className = "warning";
+        warning.textContent = "SYNTHETIC DEMO DATA · NOT AN ACTUAL FILING";
+        const excerpt = document.createElement("p");
+        excerpt.className = "excerpt";
+        excerpt.textContent = source.excerpt;
+        card.append(heading, meta, warning, excerpt);
+        sources.append(card);
+      }
+    }
+
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      if (!form.reportValidity()) return;
+      document.querySelector("#submit").disabled = true;
+      result.hidden = true;
+      progress.textContent = "Consulting the demo collection and preparing an answer…";
+      try {
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question: question.value.trim(), ticker: ticker.value.trim() || null })
+        });
+        if (!response.ok) throw new Error(`Request failed (${response.status}). Check your input and retry.`);
+        showResponse(await response.json());
+      } catch (error) {
+        showResponse({ status: "error", answer: error.message, quote: null, sources: [] });
+      } finally {
+        document.querySelector("#submit").disabled = false;
+        progress.textContent = "";
+      }
+    });
+  </script>
+</body>
+</html>
